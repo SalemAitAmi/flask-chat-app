@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Secure Chat</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.js" integrity="sha512-8BHxHDLsOHx+flIrQ0DrZcea7MkHqRU5GbTHmbdzMRnAaoCIkZ97PqZcXJkKZckMMhqfoeaJE+DNUVuyoQsO3Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col">
+    <nav class="bg-gray-800 p-4">Secure Chat App</nav>
+    <main class="flex-grow p-4">{% block content %}{% endblock %}</main>
+</body>
+</html>

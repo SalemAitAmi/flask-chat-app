@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="bg-gray-800 rounded-lg shadow-xl overflow-hidden">
+        <!-- Header Bar -->
+        <div class="flex items-center justify-between p-3 sm:p-4 md:p-5 border-b border-gray-700">
+            <div class="flex items-center space-x-3">
+                <a href="{{ url_for('chat_select') }}" class="text-white hover:text-gray-300 transition duration-200">
+                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    </svg>
+                </a>
+                <h1 class="text-lg sm:text-xl md:text-2xl font-bold text-white truncate">Chat with {{ recipient }}</h1>
+            </div>
+            <div class="text-sm flex items-center">
+                <span id="status-text" class="hidden sm:inline text-gray-400">
+                    {% if is_online %}Online{% else %}Offline{% endif %}
+                </span>
+                <span id="status-indicator" 
+                      class="inline-block h-2 w-2 rounded-full ml-1
+                            {% if is_online %}bg-green-400{% else %}bg-red-400{% endif %}">
+                </span>
+            </div>
+        </div>
+        
+        <!-- Chat Message Area -->
+        <div id="chat-container" class="bg-white p-3 sm:p-4 md:p-5 overflow-y-auto" style="height: calc(100vh - 250px); min-height: 300px; max-height: 70vh;">
+            <!-- Messages will be populated by JavaScript -->
+            <div id="loading" class="flex justify-center items-center h-full">
+                <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900"></div>
+            </div>
+        </div>
+        
+        <!-- Message Input -->
+        <div class="p-3 sm:p-4 md:p-5 bg-gray-100 border-t border-gray-300">
+            <form id="send-form" class="flex items-center space-x-2">
+                <input type="text" id="message" 
+                       class="flex-grow py-2 px-3 rounded-full bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
+                       placeholder="Type your message..." required>
+                <button type="submit" class="bg-green-500 hover:bg-green-600 text-white rounded-full p-2 focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200">
+                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                    </svg>
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+<!-- Set global variables for use in app.js -->
+<script>
+  window.chatData = {
+    username: "{{ username }}",
+    recipient: "{{ recipient }}",
+    initialConversation: {{ conversation | tojson }}
+  };
+</script>
+{% endblock %}
