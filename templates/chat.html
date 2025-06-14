@@ -2,6 +2,12 @@
 
 {% block content %}
 <div class="fixed inset-0 flex flex-col bg-gray-100">
+    {% set other_participants = chat_data.participants
+      | selectattr('username', 'ne', username)
+      | map(attribute='username')
+      | list
+    %}
+    {% set others_list = other_participants | sort | join(', ') %}
     <!-- Chat Header -->
     <div class="bg-gray-800 shadow-md px-4 py-3 flex-shrink-0">
         <div class="flex items-center justify-between">
@@ -14,9 +20,9 @@
                 <div class="flex items-center flex-grow">
                     <div class="flex-grow">
                         <div class="flex items-center">
-                            <h2 class="text-xl font-bold text-white" id="chat-name">
+                            <h2 class="text-xl font-bold text-white" id="chat-name" data-custom="{{ '1' if chat_data.name else '0' }}">
                                 {% if chat_data.type == 'group' %}
-                                    {{ chat_data.name or 'Group Chat' }}
+                                    {{ chat_data.name or others_list }}
                                 {% else %}
                                     {% for participant in chat_data.participants %}
                                         {% if participant.username != username %}
@@ -70,7 +76,7 @@
             <input 
                 type="text" 
                 id="message" 
-                class="flex-grow px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="flex-grow px-4 py-2 text-black border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Type a message..."
                 autocomplete="off"
                 required

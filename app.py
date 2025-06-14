@@ -294,8 +294,8 @@ def update_chat_name():
         chat_id = data.get('chat_id')
         name = data.get('name', '').strip()
         
-        if not chat_id or not name:
-            return jsonify({'status': 'BAD', 'message': 'Chat ID and name required'}), 400
+        if not chat_id:
+            return jsonify({'status': 'BAD', 'message': 'Chat ID required'}), 400
         
         # Verify current user has access to this chat
         user_chats = get_chatdb().getUserChats(session['username'])

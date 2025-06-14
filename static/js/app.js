@@ -80,7 +80,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const chatListHTML = chats.map(chat => {
-                const currentUsername = window.currentUsername || document.body.dataset.username;
                 const chatName = getChatDisplayName(chat);
                 const chatType = chat.type === 'group' ? 'Group' : 'Direct';
                 const lastMessageTime = chat.last_message ? formatTimeSince(chat.last_message.timestamp) : '';
@@ -88,23 +87,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     `${chat.last_message.sender}: ${truncateMessage(chat.last_message.message)}` : 
                     'No messages yet';
                 
-                // For group chats without custom names, show participant list
-                let subtitleText = chatType;
-                if (chat.type === 'group' && !chat.name) {
-                    const otherParticipants = chat.participants
-                        .filter(p => p.username !== currentUsername)
-                        .map(p => p.username)
-                        .sort();
-                    subtitleText = otherParticipants.join(', ');
-                } else if (chat.type === 'group' && chat.name) {
-                    // For named groups, show participant list as subtitle
-                    const otherParticipants = chat.participants
-                        .filter(p => p.username !== currentUsername)
-                        .map(p => p.username)
-                        .sort();
-                    subtitleText = otherParticipants.join(', ');
-                }
-
                 return `
                     <li>
                         <a href="/chat/${chat.id}" class="flex items-center px-4 py-3 hover:bg-gray-50 transition duration-200">
@@ -118,11 +100,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <p class="text-sm font-medium text-gray-900">${chatName}</p>
                                     <span class="text-xs text-gray-500">${lastMessageTime}</span>
                                 </div>
-                                <div class="flex items-center justify-between">
-                                    <p class="text-xs text-gray-500 truncate">${subtitleText}</p>
-                                    <span class="text-xs text-gray-400 ml-2">${chatType}</span>
+                                <div class="flex items-center">
+                                    <p class="text-xs text-gray-400 truncate">${lastMessagePreview}</p>
+                                    <span class="text-xs text-gray-400 ml-auto">${chatType}</span>
                                 </div>
-                                <p class="text-xs text-gray-400 truncate">${lastMessagePreview}</p>
                             </div>
                         </a>
                     </li>`;
@@ -386,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         async function showAddUserDialog() {
             const username = prompt('Enter username to add to this chat:');
-            if (!username) return;
+            if (!username || username === window.chatData.username) return;
 
             try {
                 const response = await fetch('/api/add_user_to_chat', {
@@ -422,17 +403,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function updateChatHeader() {
             // Update the header with new participant list if needed
-            const headerElement = document.getElementById('chat-header-participants');
-            if (headerElement && participants.length > 0) {
-                const names = participants.map(p => p.username).filter(u => u !== username);
-                headerElement.textContent = names.join(', ');
+            const names = participants
+                          .map(p => p.username)
+                          .filter(u => u !== username)
+                          .join(', ');
+
+            // subtitle
+            const subtitleEl = document.getElementById('chat-header-participants');
+            if (subtitleEl) subtitleEl.textContent = names;
+
+            // title (only when the DB name is blank)
+            const titleEl = document.getElementById('chat-name');
+            if (titleEl && titleEl.dataset.custom === '0') {
+                titleEl.textContent = names;
             }
         }
 
         async function showEditNameDialog() {
             const currentName = document.getElementById('chat-name').textContent.trim();
             const newName = prompt('Enter new chat name:', currentName);
-            if (!newName || newName.trim() === '') return;
+            if (newName === null) return;
 
             try {
                 const response = await fetch('/api/update_chat_name', {
@@ -445,6 +435,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.status !== 'OK') {
                     alert('Error: ' + data.message);
                 }
+                if (!newName) {
+                    const currentUsername = window.chatData.username
+                    const allParticipants = participants
+                    .filter(p => p.username !== currentUsername)
+                    .map(p => p.username)
+                    .sort()
+                    .join(', ')
+                    .trim();
+                    document.getElementById('chat-name').textContent = allParticipants;
+                }
+                // Set custom flag for `addUserToChat` updates
+                document.getElementById('chat-name').dataset.custom = newName === '' ? '0' : '1';
             } catch (error) {
                 console.error('Error renaming chat:', error);
                 alert('Error renaming chat');
