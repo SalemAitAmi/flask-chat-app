@@ -1,58 +1,109 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-    <div class="bg-gray-800 rounded-lg shadow-xl overflow-hidden">
-        <!-- Header Bar -->
-        <div class="flex items-center justify-between p-3 sm:p-4 md:p-5 border-b border-gray-700">
-            <div class="flex items-center space-x-3">
-                <a href="{{ url_for('chat_select') }}" class="text-white hover:text-gray-300 transition duration-200">
-                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<div class="fixed inset-0 flex flex-col bg-gray-100">
+    <!-- Chat Header -->
+    <div class="bg-gray-800 shadow-md px-4 py-3 flex-shrink-0">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center flex-grow">
+                <a href="{{ url_for('chat_select') }}" class="mr-3 text-white hover:text-gray-300 flex-shrink-0">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
                     </svg>
                 </a>
-                <h1 class="text-lg sm:text-xl md:text-2xl font-bold text-white truncate">Chat with {{ recipient }}</h1>
+                <div class="flex items-center flex-grow">
+                    <div class="flex-grow">
+                        <div class="flex items-center">
+                            <h2 class="text-xl font-bold text-white" id="chat-name">
+                                {% if chat_data.type == 'group' %}
+                                    {{ chat_data.name or 'Group Chat' }}
+                                {% else %}
+                                    {% for participant in chat_data.participants %}
+                                        {% if participant.username != username %}
+                                            {{ participant.username }}
+                                        {% endif %}
+                                    {% endfor %}
+                                {% endif %}
+                            </h2>
+                            {% if chat_data.type == 'group' %}
+                            <button id="edit-name-btn" class="ml-2 text-gray-400 hover:text-white">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                                </svg>
+                            </button>
+                            {% endif %}
+                        </div>
+                        <p class="text-sm text-gray-400" id="chat-header-participants">
+                            {% if chat_data.type == 'group' %}
+                                {% set other_participants = chat_data.participants | selectattr('username', 'ne', username) | list %}
+                                {{ other_participants | map(attribute='username') | sort | join(', ') }}
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
             </div>
-            <div class="text-sm flex items-center">
-                <span id="status-text" class="hidden sm:inline text-gray-400">
-                    {% if is_online %}Online{% else %}Offline{% endif %}
-                </span>
-                <span id="status-indicator" 
-                      class="inline-block h-2 w-2 rounded-full ml-1
-                            {% if is_online %}bg-green-400{% else %}bg-red-400{% endif %}">
-                </span>
-            </div>
-        </div>
-        
-        <!-- Chat Message Area -->
-        <div id="chat-container" class="bg-white p-3 sm:p-4 md:p-5 overflow-y-auto" style="height: calc(100vh - 250px); min-height: 300px; max-height: 70vh;">
-            <!-- Messages will be populated by JavaScript -->
-            <div id="loading" class="flex justify-center items-center h-full">
-                <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900"></div>
-            </div>
-        </div>
-        
-        <!-- Message Input -->
-        <div class="p-3 sm:p-4 md:p-5 bg-gray-100 border-t border-gray-300">
-            <form id="send-form" class="flex items-center space-x-2">
-                <input type="text" id="message" 
-                       class="flex-grow py-2 px-3 rounded-full bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
-                       placeholder="Type your message..." required>
-                <button type="submit" class="bg-green-500 hover:bg-green-600 text-white rounded-full p-2 focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200">
-                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+            <div class="flex items-center space-x-2">
+                {% if chat_data.participants | length < 16 %}
+                <button id="add-user-btn" class="text-white hover:text-gray-300">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
                     </svg>
                 </button>
-            </form>
+                {% endif %}
+            </div>
         </div>
     </div>
+
+   <!-- Chat Messages -->
+    <div id="chat-container" class="flex-grow overflow-y-auto px-4 py-4 space-y-2 min-h-0">
+        <div id="loading" class="flex justify-center items-center h-full">
+            <svg class="animate-spin h-8 w-8 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Message Input -->
+    <div class="bg-white border-t border-gray-200 px-4 py-3 flex-shrink-0">
+        <form id="send-form" class="flex items-center space-x-2">
+            <input 
+                type="text" 
+                id="message" 
+                class="flex-grow px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Type a message..."
+                autocomplete="off"
+                required
+            >
+            <button 
+                type="submit" 
+                class="bg-blue-500 hover:bg-blue-600 text-white rounded-full p-2 transition duration-200"
+            >
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                </svg>
+            </button>
+        </form>
+    </div>
 </div>
-<!-- Set global variables for use in app.js -->
+
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 <script>
-  window.chatData = {
-    username: "{{ username }}",
-    recipient: "{{ recipient }}",
-    initialConversation: {{ conversation | tojson }}
-  };
+    window.chatData = {
+        chatId: {{ chat_data.id }},
+        username: '{{ username }}',
+        userId: '{{ user_id }}',
+        messages: {{ chat_data.messages | tojson | safe }},
+        participants: {{ chat_data.participants | tojson | safe }}
+    };
 </script>
+
+<style>
+    #chat-container {
+        background-color: #f3f4f6;
+        background-image: 
+            linear-gradient(0deg, transparent 24%, rgba(255, 255, 255, 0.05) 25%, rgba(255, 255, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(255, 255, 255, 0.05) 75%, rgba(255, 255, 255, 0.05) 76%, transparent 77%, transparent);
+        background-size: 50px 50px;
+    }
+</style>
 {% endblock %}

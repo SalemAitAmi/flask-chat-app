@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Login functionality remains unchanged.
+    // Login functionality
     const loginForm = document.getElementById('login-form');
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
@@ -17,29 +17,329 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Chat page functionality.
+    // Register functionality
+    const registerForm = document.getElementById('register-form');
+    if (registerForm) {
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            
+            if (password !== confirmPassword) {
+                alert('Passwords do not match');
+                return;
+            }
+            
+            const response = await fetch('/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await response.json();
+            if (data.status === 'OK') {
+                alert('Registration successful! Please login.');
+                window.location.href = '/login';
+            } else {
+                alert(data.message);
+            }
+        });
+    }
+
+    // Chat selection page
+    const chatListContainer = document.getElementById('chat-list-container');
+    if (chatListContainer) {
+        loadChatList();
+
+        async function loadChatList() {
+            try {
+                const response = await fetch('/api/chats');
+                const data = await response.json();
+                
+                if (data.status === 'OK') {
+                    renderChatList(data.chats);
+                } else {
+                    console.error('Error loading chats:', data.message);
+                }
+            } catch (error) {
+                console.error('Error loading chats:', error);
+            }
+        }
+
+        function renderChatList(chats) {
+            if (chats.length === 0) {
+                chatListContainer.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-12">
+                        <svg class="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+                        </svg>
+                        <p class="text-gray-500 mb-2">No conversations yet</p>
+                        <a href="/new_chat" class="text-blue-500 hover:text-blue-600 font-medium">Start a new chat</a>
+                    </div>`;
+                return;
+            }
+
+            const chatListHTML = chats.map(chat => {
+                const currentUsername = window.currentUsername || document.body.dataset.username;
+                const chatName = getChatDisplayName(chat);
+                const chatType = chat.type === 'group' ? 'Group' : 'Direct';
+                const lastMessageTime = chat.last_message ? formatTimeSince(chat.last_message.timestamp) : '';
+                const lastMessagePreview = chat.last_message ? 
+                    `${chat.last_message.sender}: ${truncateMessage(chat.last_message.message)}` : 
+                    'No messages yet';
+                
+                // For group chats without custom names, show participant list
+                let subtitleText = chatType;
+                if (chat.type === 'group' && !chat.name) {
+                    const otherParticipants = chat.participants
+                        .filter(p => p.username !== currentUsername)
+                        .map(p => p.username)
+                        .sort();
+                    subtitleText = otherParticipants.join(', ');
+                } else if (chat.type === 'group' && chat.name) {
+                    // For named groups, show participant list as subtitle
+                    const otherParticipants = chat.participants
+                        .filter(p => p.username !== currentUsername)
+                        .map(p => p.username)
+                        .sort();
+                    subtitleText = otherParticipants.join(', ');
+                }
+
+                return `
+                    <li>
+                        <a href="/chat/${chat.id}" class="flex items-center px-4 py-3 hover:bg-gray-50 transition duration-200">
+                            <div class="flex-shrink-0">
+                                <div class="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center text-lg font-medium text-gray-600">
+                                    ${chatName.charAt(0).toUpperCase()}
+                                </div>
+                            </div>
+                            <div class="ml-3 flex-grow">
+                                <div class="flex items-center justify-between">
+                                    <p class="text-sm font-medium text-gray-900">${chatName}</p>
+                                    <span class="text-xs text-gray-500">${lastMessageTime}</span>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <p class="text-xs text-gray-500 truncate">${subtitleText}</p>
+                                    <span class="text-xs text-gray-400 ml-2">${chatType}</span>
+                                </div>
+                                <p class="text-xs text-gray-400 truncate">${lastMessagePreview}</p>
+                            </div>
+                        </a>
+                    </li>`;
+            }).join('');
+
+            chatListContainer.innerHTML = `<ul class="divide-y divide-gray-200">${chatListHTML}</ul>`;
+        }
+
+        function getChatDisplayName(chat) {
+            const currentUsername = window.currentUsername || document.body.dataset.username;
+            
+            if (chat.type === 'direct') {
+                // For direct chats, show the other person's name
+                const otherParticipant = chat.participants.find(p => p.username !== currentUsername);
+                return otherParticipant ? otherParticipant.username : 'Unknown';
+            } else {
+                // For group chats, show custom name or list of other participants
+                if (chat.name) {
+                    return chat.name;
+                } else {
+                    const otherParticipants = chat.participants
+                        .filter(p => p.username !== currentUsername)
+                        .map(p => p.username)
+                        .sort();
+                    return otherParticipants.slice(0, 3).join(', ') + 
+                           (otherParticipants.length > 3 ? ` +${otherParticipants.length - 3}` : '');
+                }
+            }
+        }
+
+        function formatTimeSince(timestamp) {
+            const now = Date.now() / 1000;
+            const diff = now - timestamp;
+            
+            if (diff < 60) return 'just now';
+            if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+            if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+            return `${Math.floor(diff / 86400)}d`;
+        }
+
+        function truncateMessage(message, maxLength = 30) {
+            if (message.length <= maxLength) return message;
+            return message.substring(0, maxLength) + '...';
+        }
+    }
+
+    // Individual chat page
     const sendForm = document.getElementById('send-form');
     if (sendForm) {
-        const username = (window.chatData && window.chatData.username) || '';
-        const rawRecipient = (window.chatData && window.chatData.recipient)
-            ? window.chatData.recipient
-            : window.location.pathname.split('/').pop();
-        const recipient = rawRecipient.replace(/\?+\s*$/, '');
-        const room = [username, recipient].sort().join('_');
-        
+        const chatId = window.chatData?.chatId || parseInt(window.location.pathname.split('/').pop());
+        const username = window.chatData?.username || document.body.dataset.username;
+        const userId = window.chatData?.userId || document.body.dataset.userId;
         const historyContainer = document.getElementById('chat-container');
         const messageInput = document.getElementById('message');
         const socket = io();
 
-        let pendingMessageIDs = [];
-        let pendingCounter = 1;
-        let renderedDateHeaders = new Set(); // Track rendered date headers
+        let renderedDateHeaders = new Set();
+        let participants = [];
 
-        // Helper function to format timestamp to local time
+        // Initialize chat
+        initializeChat();
+
+        // Auto-focus the message input
+        messageInput.focus();
+
+        // Join the chat room
+        socket.on('connect', () => {
+            socket.emit('join_chat', { chat_id: chatId });
+        });
+
+        // Listen for new messages
+        socket.on('new_message', (data) => {
+            if (data.chat_id === chatId) {
+                renderNewMessage(data);
+            }
+        });
+
+        // Listen for user additions
+        socket.on('user_added', (data) => {
+            if (data.chat_id === chatId) {
+                const notification = `${data.added_by} added ${data.username} to the chat`;
+                renderSystemMessage(notification);
+                // Reload participants
+                loadChatParticipants();
+            }
+        });
+
+        // Listen for chat renames
+        socket.on('chat_renamed', (data) => {
+            if (data.chat_id === chatId) {
+                document.getElementById('chat-name').textContent = data.new_name;
+                const notification = `${data.renamed_by} renamed the chat to "${data.new_name}"`;
+                renderSystemMessage(notification);
+            }
+        });
+
+        // Send message
+        sendForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            try {
+                const response = await fetch('/api/send_message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: chatId, message })
+                });
+
+                if (response.ok) {
+                    messageInput.value = '';
+                    messageInput.focus();
+                } else {
+                    const data = await response.json();
+                    alert('Error sending message: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error sending message:', error);
+                alert('Error sending message');
+            }
+        });
+
+        // Add user button
+        const addUserBtn = document.getElementById('add-user-btn');
+        if (addUserBtn) {
+            addUserBtn.addEventListener('click', () => {
+                showAddUserDialog();
+            });
+        }
+
+        // Edit name button
+        const editNameBtn = document.getElementById('edit-name-btn');
+        if (editNameBtn) {
+            editNameBtn.addEventListener('click', () => {
+                showEditNameDialog();
+            });
+        }
+
+        async function initializeChat() {
+            const loadingElement = document.getElementById('loading');
+            if (loadingElement) loadingElement.remove();
+
+            // Load existing messages
+            if (window.chatData?.messages) {
+                participants = window.chatData.participants || [];
+                renderMessages(window.chatData.messages);
+            } else {
+                // Fetch chat data if not provided
+                try {
+                    const response = await fetch(`/api/chat/${chatId}`);
+                    const data = await response.json();
+                    if (data.status === 'OK') {
+                        participants = data.chat.participants;
+                        renderMessages(data.chat.messages);
+                    }
+                } catch (error) {
+                    console.error('Error loading chat:', error);
+                }
+            }
+        }
+
+        function renderMessages(messages) {
+            renderedDateHeaders.clear();
+            historyContainer.innerHTML = '';
+            
+            messages.forEach(msg => {
+                renderMessage(msg);
+            });
+            
+            historyContainer.scrollTop = historyContainer.scrollHeight;
+        }
+
+        function renderMessage(msg) {
+            const formatted = formatTimestamp(msg.timestamp);
+            addDateHeaderIfNeeded(formatted.date);
+
+            const isFromCurrentUser = msg.sender === username || msg.sender_id === parseInt(userId);
+            const alignment = isFromCurrentUser ? 'text-right' : 'text-left';
+            const bgColor = isFromCurrentUser ? 'bg-blue-500 text-white' : 'bg-gray-300 text-gray-800';
+            
+            const messageHTML = `
+                <div class="${alignment} mb-2">
+                    <span class="${bgColor} rounded px-3 py-1 inline-block">
+                        ${escapeHtml(msg.message)}
+                    </span>
+                    <span class="text-xs text-gray-500">${formatted.time}</span>
+                </div>`;
+            
+            historyContainer.insertAdjacentHTML('beforeend', messageHTML);
+        }
+
+        function renderNewMessage(data) {
+            const msg = {
+                sender: data.sender,
+                sender_id: data.sender_id,
+                message: data.message,
+                timestamp: data.timestamp
+            };
+            renderMessage(msg);
+            historyContainer.scrollTop = historyContainer.scrollHeight;
+        }
+
+        function renderSystemMessage(message) {
+            const messageHTML = `
+                <div class="text-center my-2">
+                    <span class="bg-gray-200 text-gray-600 px-2 py-1 rounded text-xs">
+                        ${escapeHtml(message)}
+                    </span>
+                </div>`;
+            historyContainer.insertAdjacentHTML('beforeend', messageHTML);
+            historyContainer.scrollTop = historyContainer.scrollHeight;
+        }
+
         function formatTimestamp(timestamp) {
-            const date = new Date(timestamp * 1000); // Convert Unix timestamp to milliseconds
+            const date = new Date(timestamp * 1000);
             return {
-                date: date.toISOString().split('T')[0], // YYYY-MM-DD format without timezone affecting it
+                date: date.toISOString().split('T')[0],
                 time: date.toLocaleTimeString('en-US', { 
                     hour: '2-digit', 
                     minute: '2-digit', 
@@ -48,12 +348,22 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         }
 
-        // Helper function to get date header for a given date string
+        function addDateHeaderIfNeeded(dateString) {
+            const dateHeader = getDateHeader(dateString);
+            if (!renderedDateHeaders.has(dateHeader)) {
+                const headerHtml = `
+                    <div class="text-center my-4">
+                        <span class="bg-gray-200 text-gray-600 px-3 py-1 rounded-full text-sm font-medium">
+                            ${dateHeader}
+                        </span>
+                    </div>`;
+                historyContainer.insertAdjacentHTML('beforeend', headerHtml);
+                renderedDateHeaders.add(dateHeader);
+            }
+        }
+
         function getDateHeader(dateString) {
-            // Ensure we properly parse the date string as local date
             const messageDate = new Date(dateString + 'T00:00:00');
-            
-            // Get today/yesterday dates at midnight for proper comparison
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             
@@ -63,7 +373,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const oneWeekAgo = new Date(today);
             oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-            // Compare dates at midnight level for accurate day comparison
             if (messageDate.getTime() === today.getTime()) {
                 return "Today";
             } else if (messageDate.getTime() === yesterday.getTime()) {
@@ -75,174 +384,209 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Helper function to add date header if needed
-        function addDateHeaderIfNeeded(dateString) {
-            const dateHeader = getDateHeader(dateString);
-            if (!renderedDateHeaders.has(dateHeader)) {
-                const headerHtml = `
-                    <div class="text-center my-4" data-date-header="${dateHeader}">
-                        <span class="bg-gray-200 text-gray-600 px-3 py-1 rounded-full text-sm font-medium">
-                            ${dateHeader}
-                        </span>
-                    </div>`;
-                historyContainer.insertAdjacentHTML('beforeend', headerHtml);
-                renderedDateHeaders.add(dateHeader);
-            }
-        }
+        async function showAddUserDialog() {
+            const username = prompt('Enter username to add to this chat:');
+            if (!username) return;
 
-        // Function to render a single message
-        function renderMessage(msg, isFromCurrentUser) {
-            const formatted = formatTimestamp(msg.timestamp);
-            addDateHeaderIfNeeded(formatted.date);
+            try {
+                const response = await fetch('/api/add_user_to_chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: chatId, username })
+                });
 
-            const alignment = isFromCurrentUser ? 'text-right' : 'text-left';
-            const bgColor = isFromCurrentUser ? 'bg-blue-500 text-white' : 'bg-gray-300 text-gray-800';
-            
-            return `
-                <div class="${alignment} mb-2">
-                    <span class="${bgColor} rounded px-3 py-1 inline-block">
-                        ${msg.message}
-                    </span>
-                    <span class="text-xs text-gray-500">${formatted.time}</span>
-                </div>`;
-        }
-
-        // Function to initialize chat with existing messages
-        function initializeChat() {
-            const loadingElement = document.getElementById('loading');
-            if (loadingElement) loadingElement.remove();
-
-            if (window.chatData && window.chatData.initialConversation) {
-                const conversation = [...window.chatData.initialConversation]; // Clone the array
-                
-                // Sort messages by timestamp (oldest first)
-                conversation.sort((a, b) => a.timestamp - b.timestamp);
-                
-                // Clear existing rendered headers
-                renderedDateHeaders.clear();
-                historyContainer.innerHTML = '';
-                
-                for (const msg of conversation) {
-                    const isFromCurrentUser = msg.sender === username;
-                    historyContainer.insertAdjacentHTML('beforeend', 
-                        renderMessage(msg, isFromCurrentUser));
+                const data = await response.json();
+                if (data.status === 'OK') {
+                    // Success message will come through WebSocket
+                } else {
+                    alert('Error: ' + data.message);
                 }
-                historyContainer.scrollTop = historyContainer.scrollHeight;
+            } catch (error) {
+                console.error('Error adding user:', error);
+                alert('Error adding user to chat');
             }
         }
 
-        // When the socket connects, join the conversation room.
-        socket.on('connect', () => {
-            socket.emit('join', { room: room });
-            initializeChat();
-        });
+        async function loadChatParticipants() {
+            try {
+                const response = await fetch(`/api/chat/${chatId}`);
+                const data = await response.json();
+                if (data.status === 'OK') {
+                    participants = data.chat.participants;
+                    updateChatHeader();
+                }
+            } catch (error) {
+                console.error('Error loading participants:', error);
+            }
+        }
 
-        // Listen for new message events.
-        socket.on('new_message', (data) => {
-            console.log('Received message:', data);
-            
-            const formatted = formatTimestamp(data.timestamp);
-            
-            // If the message is from the current user, try to replace a pending message.
-            if (data.sender === username) {
-                if (pendingMessageIDs.length > 0) {
-                    const pendingID = pendingMessageIDs[0];
-                    const pendingElem = document.getElementById(pendingID);
-                    if (pendingElem) {
-                        // Check if we need a date header before the message
-                        addDateHeaderIfNeeded(formatted.date);
-                        
-                        const newMsgHtml = `
-                            <div class="text-right mb-2">
-                                <span class="bg-blue-500 text-white rounded px-3 py-1 inline-block">
-                                    ${data.message}
-                                </span>
-                                <span class="text-xs text-gray-500">${formatted.time}</span>
-                            </div>`;
-                        pendingElem.outerHTML = newMsgHtml;
-                        pendingMessageIDs.shift();
-                        historyContainer.scrollTop = historyContainer.scrollHeight;
-                        return;
+        function updateChatHeader() {
+            // Update the header with new participant list if needed
+            const headerElement = document.getElementById('chat-header-participants');
+            if (headerElement && participants.length > 0) {
+                const names = participants.map(p => p.username).filter(u => u !== username);
+                headerElement.textContent = names.join(', ');
+            }
+        }
+
+        async function showEditNameDialog() {
+            const currentName = document.getElementById('chat-name').textContent.trim();
+            const newName = prompt('Enter new chat name:', currentName);
+            if (!newName || newName.trim() === '') return;
+
+            try {
+                const response = await fetch('/api/update_chat_name', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: chatId, name: newName.trim() })
+                });
+
+                const data = await response.json();
+                if (data.status !== 'OK') {
+                    alert('Error: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error renaming chat:', error);
+                alert('Error renaming chat');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    }
+
+    // New chat page with email-like recipient input
+    const newChatForm = document.getElementById('new-chat-form');
+    if (newChatForm) {
+        const recipientInput = document.getElementById('recipient-input');
+        const recipientContainer = document.getElementById('recipient-container');
+        const selectedRecipients = new Set();
+        let allUsers = [];
+
+        // Load all users for autocomplete
+        loadAllUsers();
+
+        async function loadAllUsers() {
+            try {
+                const response = await fetch('/api/users');
+                const data = await response.json();
+                if (data.status === 'OK') {
+                    allUsers = data.users;
+                    setupAutocomplete();
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+
+        function setupAutocomplete() {
+            const datalist = document.createElement('datalist');
+            datalist.id = 'users-datalist';
+            allUsers.forEach(user => {
+                const option = document.createElement('option');
+                option.value = user;
+                datalist.appendChild(option);
+            });
+            document.body.appendChild(datalist);
+            recipientInput.setAttribute('list', 'users-datalist');
+        }
+
+        // Handle space key to add recipient
+        recipientInput.addEventListener('keydown', (e) => {
+            if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                const username = recipientInput.value.trim();
+                if (username && !selectedRecipients.has(username)) {
+                    if (allUsers.includes(username)) {
+                        addRecipientChip(username);
+                        recipientInput.value = '';
+                    } else {
+                        alert(`User "${username}" not found`);
                     }
                 }
-                
-                // If no pending element was found, append normally
-                addDateHeaderIfNeeded(formatted.date);
-                const newMsgHtml = `
-                    <div class="text-right mb-2">
-                        <span class="bg-blue-500 text-white rounded px-3 py-1 inline-block">
-                            ${data.message}
-                        </span>
-                        <span class="text-xs text-gray-500">${formatted.time}</span>
-                    </div>`;
-                historyContainer.insertAdjacentHTML('beforeend', newMsgHtml);
-            } else {
-                // For messages sent by the other user, simply append them.
-                addDateHeaderIfNeeded(formatted.date);
-                const newMsgHtml = `
-                    <div class="text-left mb-2">
-                        <span class="bg-gray-300 text-gray-800 rounded px-3 py-1 inline-block">
-                            ${data.message}
-                        </span>
-                        <span class="text-xs text-gray-500">${formatted.time}</span>
-                    </div>`;
-                historyContainer.insertAdjacentHTML('beforeend', newMsgHtml);
             }
-            historyContainer.scrollTop = historyContainer.scrollHeight;
         });
 
-        // Listen for user status changes
-        socket.on('user_status_change', (data) => {
-            if (data.username === recipient) {
-                const statusText = document.getElementById('status-text');
-                const statusIndicator = document.getElementById('status-indicator');
-                
-                if (data.status === 'online') {
-                    statusText.textContent = 'Online';
-                    statusText.classList.remove('text-gray-500');
-                    statusText.classList.add('text-gray-400');
-                    statusIndicator.classList.remove('bg-red-400');
-                    statusIndicator.classList.add('bg-green-400');
-                } else {
-                    statusText.textContent = 'Offline';
-                    statusText.classList.remove('text-gray-400');
-                    statusText.classList.add('text-gray-500');
-                    statusIndicator.classList.remove('bg-green-400');
-                    statusIndicator.classList.add('bg-red-400');
+        // Handle form submission
+        newChatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Check for any text in input field
+            const pendingUsername = recipientInput.value.trim();
+            if (pendingUsername && !selectedRecipients.has(pendingUsername)) {
+                if (allUsers.includes(pendingUsername)) {
+                    addRecipientChip(pendingUsername);
+                    recipientInput.value = '';
                 }
             }
+
+            if (selectedRecipients.size === 0) {
+                alert('Please add at least one recipient');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/create_chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        participants: Array.from(selectedRecipients)
+                    })
+                });
+
+                const data = await response.json();
+                if (data.status === 'OK') {
+                    // Redirect to the new chat
+                    window.location.href = `/chat/${data.chat_id}`;
+                } else {
+                    alert('Error creating chat: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error creating chat:', error);
+                alert('Error creating chat');
+            }
         });
 
-        // When the user sends a message.
-        sendForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const message = messageInput.value.trim();
-            if (message === '') return;
+        function addRecipientChip(username) {
+            selectedRecipients.add(username);
 
-            const pendingID = "pending_" + pendingCounter;
-            pendingCounter++;
-            pendingMessageIDs.push(pendingID);
+            const chip = document.createElement('span');
+            chip.className = 'inline-flex items-center px-3 py-1 rounded-full text-sm bg-gray-200 text-gray-800 mr-2 mb-2';
+            chip.innerHTML = `
+                ${escapeHtml(username)}
+                <button type="button" class="ml-2 text-gray-500 hover:text-gray-700" data-username="${username}">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                    </svg>
+                </button>
+            `;
 
-            // Add date header for today if needed (for the first message of the day)
-            const today = new Date();
-            const todayString = today.toISOString().split('T')[0];
-            addDateHeaderIfNeeded(todayString);
-
-            const pendingHtml = `
-                <div id="${pendingID}" class="text-right mb-2">
-                    <span class="bg-blue-500 text-white rounded px-3 py-1 inline-block">
-                        ${message} <span class="inline-block animate-spin">⏳</span>
-                    </span>
-                </div>`;
-            historyContainer.insertAdjacentHTML('beforeend', pendingHtml);
-            historyContainer.scrollTop = historyContainer.scrollHeight;
-
-            await fetch('/send_message', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ recipient, message })
+            const removeBtn = chip.querySelector('button');
+            removeBtn.addEventListener('click', () => {
+                selectedRecipients.delete(username);
+                chip.remove();
+                updateRecipientDisplay();
             });
-            messageInput.value = '';
-        });
+
+            recipientContainer.appendChild(chip);
+            updateRecipientDisplay();
+        }
+
+        function updateRecipientDisplay() {
+            if (selectedRecipients.size > 0) {
+                recipientContainer.classList.remove('hidden');
+            } else {
+                recipientContainer.classList.add('hidden');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
     }
 });

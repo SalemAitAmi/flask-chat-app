@@ -16,12 +16,24 @@
                     <label for="username" class="block text-sm font-medium text-gray-300 mb-1">Username</label>
                     <input type="text" id="username" name="username" 
                            class="w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="Choose a username"
+                           minlength="3"
                            required>
                 </div>
-                <div class="mb-6">
+                <div class="mb-4">
                     <label for="password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
                     <input type="password" id="password" name="password" 
                            class="w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="Enter password"
+                           minlength="6"
+                           required>
+                </div>
+                <div class="mb-6">
+                    <label for="confirm-password" class="block text-sm font-medium text-gray-300 mb-1">Confirm Password</label>
+                    <input type="password" id="confirm-password" name="confirm-password" 
+                           class="w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="Re-enter password"
+                           minlength="6"
                            required>
                 </div>
                 <div class="mb-4">
@@ -42,35 +54,6 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    const registerForm = document.getElementById('register-form');
-    const errorMessage = document.getElementById('error-message');
-    
-    registerForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const username = document.getElementById('username').value;
-        const password = document.getElementById('password').value;
-        
-        try {
-            const response = await fetch('/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
-            
-            const data = await response.json();
-            
-            if (data.status === 'OK') {
-                window.location.href = '/login';  // Redirect to login page on success
-            } else {
-                errorMessage.textContent = data.message;
-                errorMessage.classList.remove('hidden');
-            }
-        } catch (error) {
-            errorMessage.textContent = 'An error occurred. Please try again.';
-            errorMessage.classList.remove('hidden');
-        }
-    });
-});
+// Registration form handler is included in app.js
 </script>
 {% endblock %}
