@@ -5,7 +5,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import logging
 from utils import setup_logging, get_key, encrypt_message, decrypt_message, get_date_header, group_messages_by_date, get_utc_timestamp
-from db_management import ChatDatabase
+from db_management import ChatDatabase, db
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timezone as dt_timezone
 import pytz
@@ -14,6 +14,14 @@ import sys
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = get_key('secret.key')  # Replace with a secure key 
+
+# Configure SQLAlchemy
+db_path = 'chat_database'
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Initialize extensions
+db.init_app(app)
 socketio = SocketIO(app)
 limiter = Limiter(get_remote_address, app=app)  # Rate limiting for robustness
 login_manager = LoginManager(app)
@@ -21,15 +29,14 @@ setup_logging()  # Standardized logging from utils.py
 active_users = {}  # Track active users by username
 
 # Check if the database file exists; if not, initialize the database.
-db_path = 'chat_database'
-if not os.path.exists(db_path):
-    logging.info(f"Database '{db_path}' not found. Creating and initializing database...")
-    db = ChatDatabase(db_path)
-    db.createTables()
-    db.createIndexes()
-    db.generateSampleData()
-    db.db_conn.close()
-    logging.info("Database initialized successfully.")
+with app.app_context():
+    if not os.path.exists(db_path):
+        logging.info(f"Database '{db_path}' not found. Creating and initializing database...")
+        chat_db = ChatDatabase(db_path)
+        chat_db.createTables()
+        chat_db.createIndexes()
+        chat_db.generateSampleData()
+        logging.info("Database initialized successfully.")
 
 # Create a per-request ChatDatabase instance.
 def get_chatdb():
@@ -42,7 +49,8 @@ def close_chatdb(exception):
     chat_db = g.pop('chat_db', None)
     if chat_db is not None:
         try:
-            chat_db.db_conn.close()
+            # No need to close connection with SQLAlchemy
+            pass
         except Exception as e:
             logging.error("Error closing database connection: " + str(e))
 
