@@ -108,21 +108,7 @@ class ChatDatabase:
         :param database_name: Name of the SQLite database file (kept for compatibility).
         """
         self.database_name = database_name
-        # SQLAlchemy is initialized in the Flask app, so we don't need to do anything here
-        # This maintains backward compatibility with the existing interface
         
-        # Create a dummy connection object for backward compatibility
-        class DummyConnection:
-            def close(self):
-                pass
-            
-            def commit(self):
-                db.session.commit()
-                
-            def rollback(self):
-                db.session.rollback()
-        
-        self.db_conn = DummyConnection()
 
     def createTables(self):
         """Create all necessary database tables."""
@@ -140,7 +126,7 @@ class ChatDatabase:
 
     def generateSampleData(self):
         """Generate sample data for testing."""
-        from utils import encrypt_message, get_key, get_utc_timestamp
+        from utils import encrypt_message, get_key
         
         try:
             secret_key = get_key('secret.key')

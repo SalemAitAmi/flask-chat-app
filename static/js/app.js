@@ -1,4 +1,22 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Current timezone
+    const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    async function syncTimezoneWithBackend() {
+        if (localStorage.getItem('tz_synced') === LOCAL_TZ) return;
+
+        try {
+            await fetch('/update_timezone', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ timezone: LOCAL_TZ })
+            });
+            localStorage.setItem('tz_synced', LOCAL_TZ);
+        } catch (err) {
+            console.warn('Could not sync time-zone:', err);
+        }
+    }
+
     // Login functionality
     const loginForm = document.getElementById('login-form');
     if (loginForm) {
@@ -12,7 +30,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ username, password })
             });
             const data = await response.json();
-            if (data.status === 'OK') window.location.href = '/chat';
+            if (data.status === 'OK') {
+                await syncTimezoneWithBackend();
+                window.location.href = '/chat';
+            }
             else alert(data.message);
         });
     }
@@ -320,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
         function formatTimestamp(timestamp) {
             const date = new Date(timestamp * 1000);
             return {
-                date: date.toISOString().split('T')[0],
+                date: date.toLocaleDateString('en-CA'),
                 time: date.toLocaleTimeString('en-US', { 
                     hour: '2-digit', 
                     minute: '2-digit', 

@@ -4,20 +4,19 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import logging
-from utils import setup_logging, get_key, encrypt_message, decrypt_message, get_date_header, group_messages_by_date, get_utc_timestamp
+from utils import setup_logging, get_key, encrypt_message, decrypt_message, get_utc_timestamp
 from db_management import ChatDatabase, db
-from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timezone as dt_timezone
-import pytz
-import os
-import sys
+from werkzeug.security import check_password_hash
+from pathlib import Path
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = get_key('secret.key')  # Replace with a secure key 
 
 # Configure SQLAlchemy
-db_path = 'chat_database'
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+db_name = 'chat_database.db'
+db_path = Path(app.instance_path) / db_name
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_name}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize extensions
@@ -30,9 +29,9 @@ active_users = {}  # Track active users by username
 
 # Check if the database file exists; if not, initialize the database.
 with app.app_context():
-    if not os.path.exists(db_path):
-        logging.info(f"Database '{db_path}' not found. Creating and initializing database...")
-        chat_db = ChatDatabase(db_path)
+    if not db_path.exists():
+        logging.info(f"Database '{db_name}' not found. Creating and initializing database...")
+        chat_db = ChatDatabase(db_name)
         chat_db.createTables()
         chat_db.createIndexes()
         chat_db.generateSampleData()
@@ -41,7 +40,7 @@ with app.app_context():
 # Create a per-request ChatDatabase instance.
 def get_chatdb():
     if 'chat_db' not in g:
-        g.chat_db = ChatDatabase(db_path)
+        g.chat_db = ChatDatabase(db_name)
     return g.chat_db
 
 @app.teardown_appcontext
